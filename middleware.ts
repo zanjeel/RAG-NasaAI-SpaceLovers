@@ -10,6 +10,12 @@ export function middleware(request: NextRequest) {
         headers: Object.fromEntries(request.headers.entries())
     });
 
+    // Skip middleware for API routes
+    if (path.startsWith('/api/')) {
+        console.log('Skipping middleware for API route:', path);
+        return NextResponse.next();
+    }
+
     // Handle CORS preflight requests
     if (request.method === 'OPTIONS') {
         console.log('Handling OPTIONS request in middleware');
