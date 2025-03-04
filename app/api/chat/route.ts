@@ -2,6 +2,21 @@ import { GoogleGenerativeAI } from "@google/generative-ai"
 import { StreamingTextResponse, createStreamDataTransformer } from "ai"
 import { DataAPIClient } from "@datastax/astra-db-ts"
 
+// Add CORS headers
+const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+}
+
+// Handle OPTIONS request for CORS
+export async function OPTIONS() {
+    return new Response(null, {
+        status: 204,
+        headers: corsHeaders
+    })
+}
+
 const {
     ASTRA_DB_NAMESPACE, 
     ASTRA_DB_COLLECTION, 
@@ -9,6 +24,16 @@ const {
     ASTRA_DB_APPLICATION_TOKEN, 
     GOOGLE_API_KEY
 } = process.env
+
+// Log environment variables (without sensitive data)
+console.log('Environment check:', {
+    hasApiEndpoint: !!ASTRA_DB_API_ENDPOINT,
+    hasNamespace: !!ASTRA_DB_NAMESPACE,
+    hasCollection: !!ASTRA_DB_COLLECTION,
+    hasToken: !!ASTRA_DB_APPLICATION_TOKEN,
+    hasGoogleKey: !!GOOGLE_API_KEY,
+    apiEndpoint: ASTRA_DB_API_ENDPOINT?.substring(0, 20) + '...' // Log first 20 chars only
+})
 
 // Validate environment variables
 if (!GOOGLE_API_KEY) {
@@ -34,8 +59,20 @@ if (!ASTRA_DB_APPLICATION_TOKEN) {
 const genAI = new GoogleGenerativeAI(GOOGLE_API_KEY)
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
 
-const client = new DataAPIClient(ASTRA_DB_APPLICATION_TOKEN)
-const db = client.db(ASTRA_DB_API_ENDPOINT, {namespace: ASTRA_DB_NAMESPACE})
+// Initialize Astra DB client with error handling
+let client;
+let db;
+
+try {
+    console.log('Initializing Astra DB client...')
+    client = new DataAPIClient(ASTRA_DB_APPLICATION_TOKEN)
+    console.log('Creating DB connection...')
+    db = client.db(ASTRA_DB_API_ENDPOINT, {namespace: ASTRA_DB_NAMESPACE})
+    console.log('DB connection successful')
+} catch (error) {
+    console.error('Failed to initialize Astra DB:', error)
+    throw new Error(`Failed to initialize Astra DB: ${error.message}`)
+}
 
 export async function POST(req: Request){
     try {
@@ -143,8 +180,6 @@ export async function POST(req: Request){
             }
         });
         
-        
-
         // Use the ai package's stream transformer
         const transformedStream = stream.pipeThrough(createStreamDataTransformer())
         
@@ -153,6 +188,7 @@ export async function POST(req: Request){
                 'Content-Type': 'text/event-stream',
                 'Cache-Control': 'no-cache',
                 'Connection': 'keep-alive',
+                ...corsHeaders
             },
         })
     } catch(err: any) {
@@ -165,7 +201,10 @@ export async function POST(req: Request){
                 details: err.message 
             }), {
                 status: 429,
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 
+                    'Content-Type': 'application/json',
+                    ...corsHeaders
+                }
             })
         }
         
@@ -175,7 +214,10 @@ export async function POST(req: Request){
                 details: err.message 
             }), {
                 status: 401,
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 
+                    'Content-Type': 'application/json',
+                    ...corsHeaders
+                }
             })
         }
 
@@ -184,7 +226,10 @@ export async function POST(req: Request){
             details: err.message 
         }), {
             status: 500,
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 
+                'Content-Type': 'application/json',
+                ...corsHeaders
+            }
         })
     }
 }
