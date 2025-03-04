@@ -42,27 +42,27 @@ function validateEnv() {
     console.log('Validating environment variables...')
     if (!GOOGLE_API_KEY) {
         console.error('Missing GOOGLE_API_KEY')
-        return NextResponse.json({ error: 'GOOGLE_API_KEY is not set in environment variables' }, { status: 500 })
+        return NextResponse.json({ error: 'GOOGLE_API_KEY is not set in environment variables' }, { status: 500, headers: corsHeaders })
     }
 
     if (!ASTRA_DB_API_ENDPOINT) {
         console.error('Missing ASTRA_DB_API_ENDPOINT')
-        return NextResponse.json({ error: 'ASTRA_DB_API_ENDPOINT is not set in environment variables' }, { status: 500 })
+        return NextResponse.json({ error: 'ASTRA_DB_API_ENDPOINT is not set in environment variables' }, { status: 500, headers: corsHeaders })
     }
 
     if (!ASTRA_DB_NAMESPACE) {
         console.error('Missing ASTRA_DB_NAMESPACE')
-        return NextResponse.json({ error: 'ASTRA_DB_NAMESPACE is not set in environment variables' }, { status: 500 })
+        return NextResponse.json({ error: 'ASTRA_DB_NAMESPACE is not set in environment variables' }, { status: 500, headers: corsHeaders })
     }
 
     if (!ASTRA_DB_COLLECTION) {
         console.error('Missing ASTRA_DB_COLLECTION')
-        return NextResponse.json({ error: 'ASTRA_DB_COLLECTION is not set in environment variables' }, { status: 500 })
+        return NextResponse.json({ error: 'ASTRA_DB_COLLECTION is not set in environment variables' }, { status: 500, headers: corsHeaders })
     }
 
     if (!ASTRA_DB_APPLICATION_TOKEN) {
         console.error('Missing ASTRA_DB_APPLICATION_TOKEN')
-        return NextResponse.json({ error: 'ASTRA_DB_APPLICATION_TOKEN is not set in environment variables' }, { status: 500 })
+        return NextResponse.json({ error: 'ASTRA_DB_APPLICATION_TOKEN is not set in environment variables' }, { status: 500, headers: corsHeaders })
     }
 
     console.log('Environment validation passed')
@@ -86,7 +86,7 @@ function initializeDB() {
         return null
     } catch (error) {
         console.error('Failed to initialize Astra DB:', error)
-        return NextResponse.json({ error: `Failed to initialize Astra DB: ${error.message}` }, { status: 500 })
+        return NextResponse.json({ error: `Failed to initialize Astra DB: ${error.message}` }, { status: 500, headers: corsHeaders })
     }
 }
 
@@ -221,7 +221,7 @@ export async function POST(req: Request){
         const transformedStream = stream.pipeThrough(createStreamDataTransformer())
         
         console.log('Returning streaming response')
-        return new StreamingTextResponse(transformedStream)
+        return new StreamingTextResponse(transformedStream, { headers: corsHeaders })
     } catch(err: any) {
         console.error('API error:', err)
         console.error('Error details:', {
@@ -235,19 +235,19 @@ export async function POST(req: Request){
             return NextResponse.json({ 
                 error: 'Rate limit exceeded. Please try again later or check your API quota.',
                 details: err.message 
-            }, { status: 429 })
+            }, { status: 429, headers: corsHeaders })
         }
         
         if (err.message?.includes('API key')) {
             return NextResponse.json({ 
                 error: 'Invalid API key. Please check your GOOGLE_API_KEY environment variable.',
                 details: err.message 
-            }, { status: 401 })
+            }, { status: 401, headers: corsHeaders })
         }
 
         return NextResponse.json({ 
             error: 'Internal server error',
             details: err.message 
-        }, { status: 500 })
+        }, { status: 500, headers: corsHeaders })
     }
 }
