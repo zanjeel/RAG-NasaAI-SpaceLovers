@@ -16,7 +16,6 @@
     "dotenv": "^16.4.5",
     "langchain": "^0.1.36",
     "next": "14.2.3",
-    "openai": "^4.76.2",
     "puppeteer": "^19.11.1",
     "react": "^18",
     "react-dom": "^18",
