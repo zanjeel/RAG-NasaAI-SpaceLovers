@@ -11,6 +11,12 @@ export function middleware(request: NextRequest) {
     // Get the pathname of the request (e.g. /, /api/chat)
     const path = request.nextUrl.pathname;
 
+    // Skip middleware for API routes
+    if (path.startsWith('/api/')) {
+        console.log('Skipping middleware for API route:', path);
+        return NextResponse.next();
+    }
+
     // Add CORS headers for all responses
     const response = NextResponse.next();
 
@@ -35,7 +41,7 @@ export function middleware(request: NextRequest) {
 // Configure which paths the middleware should run on
 export const config = {
     matcher: [
-        // Match all paths except static files and api routes
-        '/((?!_next/static|_next/image|favicon.ico|api/).*)',
+        // Match all paths except static files
+        '/((?!_next/static|_next/image|favicon.ico).*)',
     ],
 };

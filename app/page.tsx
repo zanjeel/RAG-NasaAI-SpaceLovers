@@ -68,26 +68,12 @@ const Home =() =>{
         }
     
         try {
-            const response = await fetch('/api/chat', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ messages: [{ content: input, role: 'user' }] }),
-            });
-    
-            if (!response.ok) {
-                console.error('Failed to send message', response);
-                return;
-            }
-
-            // Use the built-in handleSubmit from useChat
-            handleSubmit(e);
+            console.log('Submitting form with input:', input);
+            await handleSubmit(e);
         } catch (error) {
-            console.error('Error sending message:', error);
+            console.error('Error submitting form:', error);
         }
     };
-    
 
     return (
         <main>
