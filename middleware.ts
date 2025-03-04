@@ -10,14 +10,17 @@ export function middleware(request: NextRequest) {
     console.log('Request path:', path)
     console.log('Request headers:', Object.fromEntries(request.headers.entries()))
 
-    // Skip middleware for API routes
+    // Handle API routes
     if (path.startsWith('/api/')) {
-        console.log('Skipping middleware for API route:', path);
+        console.log('Processing API route:', path);
         const response = NextResponse.next();
+        
         // Add CORS headers to API responses
         response.headers.set('Access-Control-Allow-Origin', '*');
         response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
         response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+        
+        console.log('API response headers:', Object.fromEntries(response.headers.entries()));
         return response;
     }
 
@@ -34,7 +37,7 @@ export function middleware(request: NextRequest) {
         });
     }
 
-    // Get the response
+    // Get the response for non-API routes
     const response = NextResponse.next();
 
     // Add CORS headers to all responses

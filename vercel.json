@@ -22,7 +22,6 @@
     "ASTRA_DB_NAMESPACE": "@astra_db_namespace",
     "ASTRA_DB_COLLECTION": "@astra_db_collection",
     "ASTRA_DB_API_ENDPOINT": "@astra_db_api_endpoint",
-    "ASTRA_DB_APPLICATION_TOKEN": "@astra_db_application_token",
-    "NEXT_PUBLIC_API_URL": "https://rag-nasa-985yq5ze4-zanjeel-tariq-sahis-projects.vercel.app/api/chat"
+    "ASTRA_DB_APPLICATION_TOKEN": "@astra_db_application_token"
   }
 } 

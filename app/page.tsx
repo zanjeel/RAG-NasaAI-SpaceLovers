@@ -10,7 +10,7 @@ import {useEffect} from "react"
 
 const Home =() =>{
     const {append, isLoading, messages, input, handleInputChange, handleSubmit, setMessages}= useChat({
-        api: process.env.NEXT_PUBLIC_API_URL || '/api/chat',
+        api: '/api/chat',
         onError: (error) => {
             console.error('Chat error:', error)
             console.error('Error details:', {
