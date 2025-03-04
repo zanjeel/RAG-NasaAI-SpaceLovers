@@ -1,40 +1,106 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/pages/api-reference/create-next-app).
+# NASA AI - Space Knowledge Assistant
 
-## Getting Started
+A RAG (Retrieval Augmented Generation) powered AI chatbot that provides information about NASA's space missions, telescopes, and space exploration. Built with Next.js and powered by Google's Gemini AI.
 
-First, run the development server:
+## 🌐 Live Demo
+Visit the live application at: [NASA AI Space Lovers](https://rag-nasaai-spacelovers.onrender.com/)
 
+## 🎥 Demo Video
+Watch the demo video: [NASA AI Demo](media/NASA-Recording.mp4)
+
+## 🚀 Technologies Used
+- **Frontend**: Next.js 14, React, TypeScript
+- **AI/ML**: Google Gemini AI (Gemini 1.5 Flash)
+- **Database**: Astra DB (Vector Database)
+- **Styling**: CSS3 with Custom Variables
+- **Deployment**: Render
+
+## 🛠️ Features
+- Real-time chat interface with AI
+- Vector-based semantic search
+- Responsive design for all devices
+- Streaming responses
+- Pre-defined prompt suggestions
+- Beautiful UI with dark theme
+
+## 📋 Prerequisites
+- Node.js (v18 or higher)
+- npm or yarn
+- Google API Key
+- Astra DB Account and credentials
+
+## 🔧 Environment Variables
+Create a `.env` file in the root directory with the following variables:
+```env
+GOOGLE_API_KEY=your_google_api_key
+ASTRA_DB_NAMESPACE=your_namespace
+ASTRA_DB_COLLECTION=your_collection
+ASTRA_DB_API_ENDPOINT=your_api_endpoint
+ASTRA_DB_APPLICATION_TOKEN=your_application_token
+```
+
+## 🚀 Getting Started
+
+1. **Clone the repository**
+```bash
+git clone <your-repo-url>
+cd nasa-ai
+```
+
+2. **Install dependencies**
+```bash
+npm install
+# or
+yarn install
+```
+
+3. **Set up environment variables**
+- Copy the `.env.example` file to `.env`
+- Fill in your environment variables
+
+4. **Run the development server**
 ```bash
 npm run dev
 # or
 yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+5. **Open [http://localhost:3000](http://localhost:3000) in your browser**
 
-You can start editing the page by modifying `pages/index.tsx`. The page auto-updates as you edit the file.
+## 🗄️ Database Setup
+The project uses Astra DB as a vector database. You'll need to:
+1. Create an Astra DB account
+2. Create a new database
+3. Create a collection for storing embeddings
+4. Run the database seeding script:
+```bash
+npm run seed
+# or
+yarn seed
+```
 
-[API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) can be accessed on [http://localhost:3000/api/hello](http://localhost:3000/api/hello). This endpoint can be edited in `pages/api/hello.ts`.
+## 🏗️ Build for Production
+```bash
+npm run build
+# or
+yarn build
+```
 
-The `pages/api` directory is mapped to `/api/*`. Files in this directory are treated as [API routes](https://nextjs.org/docs/pages/building-your-application/routing/api-routes) instead of React pages.
+## 🚀 Deployment
+The application is deployed on Render. To deploy:
+1. Push your code to GitHub
+2. Connect your repository to Render
+3. Set up environment variables in Render dashboard
+4. Deploy!
 
-This project uses [`next/font`](https://nextjs.org/docs/pages/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 📱 Mobile Responsiveness
+The application is fully responsive and works on:
+- Desktop
+- Tablet
+- Mobile devices
 
-## Learn More
+## 🤝 Contributing
+Contributions are welcome! Please feel free to submit a Pull Request.
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn-pages-router) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/pages/building-your-application/deploying) for more details.
+## 📄 License
+This project is licensed under the MIT License - see the LICENSE file for details.
