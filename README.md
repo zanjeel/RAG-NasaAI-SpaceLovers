@@ -1,5 +1,7 @@
 # NASA AI - Space Knowledge Assistant
 
+![NASA AI Demo](public/nasa-demo.png)
+
 A RAG (Retrieval Augmented Generation) powered AI chatbot that provides information about NASA's space missions, telescopes, and space exploration. Built with Next.js and powered by Google's Gemini AI.
 
 ## 🌐 Live Demo
