@@ -14,7 +14,28 @@ const {
     GOOGLE_API_KEY
 } = process.env
 
-const genAI = new GoogleGenerativeAI(GOOGLE_API_KEY || '')
+// Validate environment variables
+if (!GOOGLE_API_KEY) {
+    throw new Error('GOOGLE_API_KEY is not set in environment variables');
+}
+
+if (!ASTRA_DB_NAMESPACE) {
+    throw new Error('ASTRA_DB_NAMESPACE is not set in environment variables');
+}
+
+if (!ASTRA_DB_COLLECTION) {
+    throw new Error('ASTRA_DB_COLLECTION is not set in environment variables');
+}
+
+if (!ASTRA_DB_API_ENDPOINT) {
+    throw new Error('ASTRA_DB_API_ENDPOINT is not set in environment variables');
+}
+
+if (!ASTRA_DB_APPLICATION_TOKEN) {
+    throw new Error('ASTRA_DB_APPLICATION_TOKEN is not set in environment variables');
+}
+
+const genAI = new GoogleGenerativeAI(GOOGLE_API_KEY)
 
 const eudata=[
     'https://en.wikipedia.org/wiki/List_of_NASA_missions',

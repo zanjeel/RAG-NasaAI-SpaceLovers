@@ -1,8 +1,8 @@
 import "./global.css";
 
 export const metadata={
-    title:"Eu Regulations",
-    description:"Want to know if you comply with All the EU Regulations? Ask Away"
+    title:"Nasa AI",
+    description:"Here you can ask anything about NASA"
 }
 
 const RootLayout=({children})=>{

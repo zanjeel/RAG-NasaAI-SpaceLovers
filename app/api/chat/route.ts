@@ -69,18 +69,30 @@ function validateEnv() {
     return null
 }
 
-const genAI = new GoogleGenerativeAI(GOOGLE_API_KEY)
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
+// Initialize Gemini AI only if API key is available
+let genAI: GoogleGenerativeAI | null = null;
+let model: any = null;
+
+if (GOOGLE_API_KEY) {
+    genAI = new GoogleGenerativeAI(GOOGLE_API_KEY);
+    model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+}
 
 // Initialize Astra DB client with error handling
-let client;
-let db;
+let client: DataAPIClient | null = null;
+let db: any = null;
 
 function initializeDB() {
     try {
         console.log('Initializing Astra DB client...')
+        if (!ASTRA_DB_APPLICATION_TOKEN) {
+            throw new Error('ASTRA_DB_APPLICATION_TOKEN is not set');
+        }
         client = new DataAPIClient(ASTRA_DB_APPLICATION_TOKEN)
         console.log('Creating DB connection...')
+        if (!ASTRA_DB_API_ENDPOINT || !ASTRA_DB_NAMESPACE) {
+            throw new Error('ASTRA_DB_API_ENDPOINT or ASTRA_DB_NAMESPACE is not set');
+        }
         db = client.db(ASTRA_DB_API_ENDPOINT, {namespace: ASTRA_DB_NAMESPACE})
         console.log('DB connection successful')
         return null
@@ -107,6 +119,10 @@ export const POST = async (req: Request) => {
             return envError
         }
 
+        if (!genAI || !model) {
+            return NextResponse.json({ error: 'Gemini AI not initialized' }, { status: 500, headers: corsHeaders })
+        }
+
         const {messages} = await req.json()
         console.log('Received messages:', messages)
         
@@ -124,6 +140,9 @@ export const POST = async (req: Request) => {
 
         try {
             console.log('Querying database with embedding...')
+            if (!db || !ASTRA_DB_COLLECTION) {
+                throw new Error('Database or collection not initialized');
+            }
             const collection = await db.collection(ASTRA_DB_COLLECTION)
             const cursor = collection.find(null, {
                 sort: {
