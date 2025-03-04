@@ -7,10 +7,10 @@
     }
   ],
   "env": {
-    "GOOGLE_API_KEY": "@google_api_key",
-    "ASTRA_DB_NAMESPACE": "@astra_db_namespace",
-    "ASTRA_DB_COLLECTION": "@astra_db_collection",
-    "ASTRA_DB_API_ENDPOINT": "@astra_db_api_endpoint",
-    "ASTRA_DB_APPLICATION_TOKEN": "@astra_db_application_token"
+    "GOOGLE_API_KEY": "${GOOGLE_API_KEY}",
+    "ASTRA_DB_NAMESPACE": "${ASTRA_DB_NAMESPACE}",
+    "ASTRA_DB_COLLECTION": "${ASTRA_DB_COLLECTION}",
+    "ASTRA_DB_API_ENDPOINT": "${ASTRA_DB_API_ENDPOINT}",
+    "ASTRA_DB_APPLICATION_TOKEN": "${ASTRA_DB_APPLICATION_TOKEN}"
   }
 } 
