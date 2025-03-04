@@ -6,6 +6,17 @@
       "use": "@vercel/next"
     }
   ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization"
+      },
+      "continue": true
+    }
+  ],
   "env": {
     "GOOGLE_API_KEY": "@google_api_key",
     "ASTRA_DB_NAMESPACE": "@astra_db_namespace",
