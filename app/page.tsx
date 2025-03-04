@@ -34,6 +34,12 @@ const Home =() =>{
                 statusText: response.statusText,
                 headers: Object.fromEntries(response.headers.entries())
             })
+        },
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: {
+            // Add any additional body parameters here
         }
     })
     
