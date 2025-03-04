@@ -11,7 +11,7 @@ const corsHeaders = {
 }
 
 // Handle OPTIONS request for CORS
-export async function OPTIONS() {
+export async function OPTIONS(request: Request) {
     console.log('Handling OPTIONS request')
     return new Response(null, {
         status: 204,
@@ -109,7 +109,7 @@ if (dbError) {
 }
 
 // Export the POST handler
-export const POST = async (req: Request) => {
+export async function POST(request: Request) {
     console.log('Received POST request to /api/chat')
     try {
         // Validate environment variables
@@ -123,7 +123,7 @@ export const POST = async (req: Request) => {
             return NextResponse.json({ error: 'Gemini AI not initialized' }, { status: 500, headers: corsHeaders })
         }
 
-        const {messages} = await req.json()
+        const {messages} = await request.json()
         console.log('Received messages:', messages)
         
         const latestMessage = messages[messages?.length-1]?.content

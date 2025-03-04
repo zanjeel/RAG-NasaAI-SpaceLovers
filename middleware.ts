@@ -7,18 +7,12 @@ export function middleware(request: NextRequest) {
     console.log('Middleware processing request:', {
         method: request.method,
         path,
-        headers: Object.fromEntries([...request.headers.entries()].filter(([key]) => key !== 'authorization'))
+        headers: Object.fromEntries(request.headers.entries())
     });
 
-    // Skip middleware for API routes
-    if (path.startsWith('/api/')) {
-        console.log('Skipping middleware for API route:', path);
-        return NextResponse.next();
-    }
-
-    // Handle OPTIONS preflight request
+    // Handle CORS preflight requests
     if (request.method === 'OPTIONS') {
-        console.log('Handling OPTIONS preflight request');
+        console.log('Handling OPTIONS request in middleware');
         return new NextResponse(null, {
             status: 204,
             headers: {
@@ -29,10 +23,10 @@ export function middleware(request: NextRequest) {
         });
     }
 
-    // Get the response and add CORS headers
+    // Get the response
     const response = NextResponse.next();
-    
-    // Add CORS headers to the response
+
+    // Add CORS headers to all responses
     response.headers.set('Access-Control-Allow-Origin', '*');
     response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
     response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -44,7 +38,13 @@ export function middleware(request: NextRequest) {
 // Configure which paths the middleware should run on
 export const config = {
     matcher: [
-        // Match all paths except static files and API routes
-        '/((?!_next/static|_next/image|favicon.ico|api/).*)',
+        /*
+         * Match all request paths except for the ones starting with:
+         * - _next/static (static files)
+         * - _next/image (image optimization files)
+         * - favicon.ico (favicon file)
+         * - public folder
+         */
+        '/((?!_next/static|_next/image|favicon.ico|public).*)',
     ],
 };
