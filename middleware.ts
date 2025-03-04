@@ -4,16 +4,21 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
     const path = request.nextUrl.pathname;
 
-    console.log('Middleware processing request:', {
-        method: request.method,
-        path,
-        headers: Object.fromEntries(request.headers.entries())
-    });
+    console.log('=== MIDDLEWARE START ===')
+    console.log('Request URL:', request.url)
+    console.log('Request method:', request.method)
+    console.log('Request path:', path)
+    console.log('Request headers:', Object.fromEntries(request.headers.entries()))
 
     // Skip middleware for API routes
     if (path.startsWith('/api/')) {
         console.log('Skipping middleware for API route:', path);
-        return NextResponse.next();
+        const response = NextResponse.next();
+        // Add CORS headers to API responses
+        response.headers.set('Access-Control-Allow-Origin', '*');
+        response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+        response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+        return response;
     }
 
     // Handle CORS preflight requests
@@ -24,7 +29,7 @@ export function middleware(request: NextRequest) {
             headers: {
                 'Access-Control-Allow-Origin': '*',
                 'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+                'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
             },
         });
     }
@@ -35,9 +40,9 @@ export function middleware(request: NextRequest) {
     // Add CORS headers to all responses
     response.headers.set('Access-Control-Allow-Origin', '*');
     response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
 
-    console.log('Request processed, continuing to handler');
+    console.log('=== MIDDLEWARE END ===')
     return response;
 }
 

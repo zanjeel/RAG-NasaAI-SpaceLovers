@@ -12,7 +12,10 @@ const corsHeaders = {
 
 // Handle OPTIONS request for CORS
 export async function OPTIONS(request: Request) {
-    console.log('Handling OPTIONS request in /api/chat')
+    console.log('=== OPTIONS HANDLER CALLED ===')
+    console.log('Request URL:', request.url)
+    console.log('Request method:', request.method)
+    console.log('Request headers:', Object.fromEntries(request.headers.entries()))
     return new Response(null, {
         status: 204,
         headers: corsHeaders
@@ -110,7 +113,9 @@ if (dbError) {
 
 // Export the POST handler
 export async function POST(request: Request) {
-    console.log('Received POST request to /api/chat')
+    console.log('=== POST HANDLER CALLED ===')
+    console.log('Request URL:', request.url)
+    console.log('Request method:', request.method)
     console.log('Request headers:', Object.fromEntries(request.headers.entries()))
     
     try {
@@ -249,7 +254,10 @@ export async function POST(request: Request) {
         console.log('Returning streaming response')
         return new StreamingTextResponse(transformedStream, { headers: corsHeaders })
     } catch(err: any) {
-        console.error('API error:', err)
+        console.error('=== API ERROR ===')
+        console.error('Error type:', err.name)
+        console.error('Error message:', err.message)
+        console.error('Error stack:', err.stack)
         console.error('Error details:', {
             message: err.message,
             stack: err.stack,
