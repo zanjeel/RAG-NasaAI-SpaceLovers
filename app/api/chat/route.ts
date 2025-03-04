@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai"
-import { StreamingTextResponse } from "ai"
+import { StreamingTextResponse, createStreamDataTransformer } from "ai"
 import { DataAPIClient } from "@datastax/astra-db-ts"
 
 const {
@@ -10,8 +10,13 @@ const {
     GOOGLE_API_KEY
 } = process.env
 
-const genAI = new GoogleGenerativeAI(GOOGLE_API_KEY || '')
-const model = genAI.getGenerativeModel({ model: "gemini-pro" })
+// Validate API key
+if (!GOOGLE_API_KEY) {
+    throw new Error('GOOGLE_API_KEY is not set in environment variables')
+}
+
+const genAI = new GoogleGenerativeAI(GOOGLE_API_KEY)
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
 
 const client = new DataAPIClient(ASTRA_DB_APPLICATION_TOKEN)
 const db = client.db(ASTRA_DB_API_ENDPOINT, {namespace: ASTRA_DB_NAMESPACE})
@@ -19,7 +24,11 @@ const db = client.db(ASTRA_DB_API_ENDPOINT, {namespace: ASTRA_DB_NAMESPACE})
 export async function POST(req: Request){
     try {
         const {messages} = await req.json()
+        console.log('Received messages:', messages)
+        
         const latestMessage = messages[messages?.length-1]?.content
+        console.log('Latest message:', latestMessage)
+        
         let docContext = ""
 
         // Get embedding from Gemini
@@ -44,49 +53,122 @@ export async function POST(req: Request){
             docContext = ""
         }
 
-        const template = {
-            role: "system",
-            content: `You are a funny, space nerd who knows everything
-            about NASA. You must know their recent space exploration missions and latest space news. 
-            The context will provide you with data from the NASA Wikipedia Websites.
-            If the context doesn't include the information you need, answer
-            based on your existing knowledge.
+        // Format the conversation history for Gemini
+        const formattedMessages = messages.map(msg => ({
+            role: msg.role === 'user' ? 'user' : 'model',
+            parts: [{ text: msg.content }]
+        }))
 
-            Format your responses as follows:
-            1. Break information into clear, concise paragraphs but keep them fun and nerdy.
-            2. Each paragraph should be 3-5 lines maximum.
-            3. Use 2 line spacing between paragraphs.
-            4. Do not use asterisks or markdown formatting or images.
-            5. Use simple, clear language.
-            6. Keep sentences short and direct but nerdy.
+        // Add the system prompt
+        formattedMessages.unshift({
+            role: 'user',
+            parts: [{
+                text: `You are a funny, space nerd who knows everything
+                about NASA. You must know their recent space exploration missions and latest space news. 
+                The context will provide you with data from the NASA Wikipedia Websites.
+                If the context doesn't include the information you need, answer
+                based on your existing knowledge.
 
-            -----------
-            START CONTEXT
-            ${docContext}
-            END CONTEXT
-            ------------
-            QUESTION: ${latestMessage}
-            ------------
-            `
-        }
+                Format your responses as follows:
+                1. Break information into clear, concise paragraphs but keep them fun and nerdy.
+                2. Each paragraph should be 3-5 lines maximum.
+                3. Use 2 line spacing between paragraphs.
+                4. Do not use asterisks or markdown formatting or images.
+                5. Use simple, clear language.
+                6. Keep sentences short and direct but nerdy.
 
-        const result = await model.generateContentStream([
-            template.content,
-            ...messages.map(m => m.content)
-        ])
+                -----------
+                START CONTEXT
+                ${docContext}
+                END CONTEXT
+                ------------
+                QUESTION: ${latestMessage}
+                ------------
+                `
+            }]
+        })
+
+        console.log('Sending to Gemini:', formattedMessages)
+        const result = await model.generateContentStream({
+            contents: formattedMessages
+        })
 
         // Convert Gemini stream to ReadableStream
         const stream = new ReadableStream({
             async start(controller) {
-                for await (const chunk of result.stream) {
-                    controller.enqueue(chunk.text())
+                try {
+                    let buffer = ""; // Buffer to accumulate text properly
+        
+                    for await (const chunk of result.stream) {
+                        const text = chunk.text();
+                        console.log('Received chunk:', text);
+                        
+                        if (text) {
+                            buffer += text; // Append new chunk to the buffer
+        
+                            // Check if the buffer has a complete sentence
+                            if (buffer.includes('. ') || buffer.includes('! ') || buffer.includes('? ')) {
+                                controller.enqueue(new TextEncoder().encode(buffer + '\n')); 
+                                buffer = ""; // Reset buffer after sending
+                            }
+                        }
+                    }
+        
+                    // Send any remaining text in the buffer
+                    if (buffer.trim().length > 0) {
+                        controller.enqueue(new TextEncoder().encode(buffer + '\n\n'));
+                    }
+        
+                    controller.close();
+                } catch (error) {
+                    console.error('Streaming error:', error);
+                    controller.error(error);
                 }
-                controller.close()
             }
-        })
+        });
+        
+        
 
-        return new StreamingTextResponse(stream)
-    } catch(err) {
-        throw err
+        // Use the ai package's stream transformer
+        const transformedStream = stream.pipeThrough(createStreamDataTransformer())
+        
+        return new Response(transformedStream, {
+            headers: {
+                'Content-Type': 'text/event-stream',
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+            },
+        })
+    } catch(err: any) {
+        console.error('API error:', err)
+        
+        // Handle specific error types
+        if (err.message?.includes('429')) {
+            return new Response(JSON.stringify({ 
+                error: 'Rate limit exceeded. Please try again later or check your API quota.',
+                details: err.message 
+            }), {
+                status: 429,
+                headers: { 'Content-Type': 'application/json' }
+            })
+        }
+        
+        if (err.message?.includes('API key')) {
+            return new Response(JSON.stringify({ 
+                error: 'Invalid API key. Please check your GOOGLE_API_KEY environment variable.',
+                details: err.message 
+            }), {
+                status: 401,
+                headers: { 'Content-Type': 'application/json' }
+            })
+        }
+
+        return new Response(JSON.stringify({ 
+            error: 'Internal server error',
+            details: err.message 
+        }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+        })
     }
 }

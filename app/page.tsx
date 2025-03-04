@@ -6,19 +6,43 @@ import {Message} from "ai"
 import Bubble from "./components/Bubble"
 import LoadingBubble from "./components/LoadingBubble"
 import PromptSuggestionsRow from "./components/PromptSuggestionsRow"
+import {useEffect} from "react"
 
 const Home =() =>{
-    const {append, isLoading, messages, input, handleInputChange, handleSubmit}= useChat()
+    const {append, isLoading, messages, input, handleInputChange, handleSubmit, setMessages}= useChat({
+        api: '/api/chat',
+        onError: (error) => {
+            console.error('Chat error:', error)
+        },
+        onFinish: (message) => {
+            console.log('Chat finished:', message)
+        },
+        onResponse: (response) => {
+            console.log('Got response:', response)
+        }
+    })
     
     const noMessages= !messages || messages.length===0
 
+    useEffect(() => {
+        console.log('Messages updated:', messages)
+    }, [messages])
+
     const handlePrompt=(prompText)=>{
+        console.log('Handling prompt:', prompText)
         const msg: Message= {
             id: crypto.randomUUID(),
             content:prompText,
             role:"user"
         }
         append(msg)
+    }
+
+    const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault()
+        console.log('Form submitted with input:', input)
+        if (!input.trim()) return
+        handleSubmit(e)
     }
 
     return (
@@ -41,21 +65,24 @@ const Home =() =>{
                     </>
                 ):(
                     <>
-                        {messages.map((message, index)=> <Bubble key={`message-${index}`} message={message}/>)}
+                        {messages.map((message, index)=> (
+                            <Bubble key={`message-${index}`} message={message}/>
+                        ))}
                         {isLoading && <LoadingBubble/>}
                     </>
                 )}
             </section>
 
-            <form onSubmit={handleSubmit} className="input-form">
+            <form onSubmit={handleFormSubmit} className="input-form">
                 <input 
                     className="question-box" 
                     onChange={handleInputChange} 
                     value={input} 
                     placeholder="Ask me anything about Nasa..."
+                    disabled={isLoading}
                 />
-                <button type="submit" className="submit-button">
-                    Send
+                <button type="submit" className="submit-button" disabled={isLoading}>
+                    {isLoading ? 'Sending...' : 'Send'}
                 </button>
             </form>
         </main>
