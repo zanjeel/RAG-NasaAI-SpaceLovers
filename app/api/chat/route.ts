@@ -96,7 +96,8 @@ if (dbError) {
     console.error('Failed to initialize database:', dbError)
 }
 
-export async function POST(req: Request){
+// Export the POST handler
+export const POST = async (req: Request) => {
     console.log('Received POST request to /api/chat')
     try {
         // Validate environment variables
