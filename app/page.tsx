@@ -34,12 +34,6 @@ const Home =() =>{
                 statusText: response.statusText,
                 headers: Object.fromEntries(response.headers.entries())
             })
-        },
-        onMessage: (message) => {
-            console.log('New message received:', message)
-        },
-        onStart: (message) => {
-            console.log('Chat started:', message)
         }
     })
     
@@ -65,16 +59,35 @@ const Home =() =>{
         append(msg)
     }
 
-    const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault()
-        console.log('Form submitted with input:', input)
+    const handleFormSubmit = async (e) => {
+        e.preventDefault();
+    
         if (!input.trim()) {
-            console.log('Empty input, skipping submission')
-            return
+            console.log('Empty input, skipping submission');
+            return;
         }
-        console.log('Submitting form...')
-        handleSubmit(e)
-    }
+    
+        try {
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ messages: [{ content: input, role: 'user' }] }),
+            });
+    
+            if (!response.ok) {
+                console.error('Failed to send message', response);
+                return;
+            }
+
+            // Use the built-in handleSubmit from useChat
+            handleSubmit(e);
+        } catch (error) {
+            console.error('Error sending message:', error);
+        }
+    };
+    
 
     return (
         <main>
