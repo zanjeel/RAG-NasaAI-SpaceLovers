@@ -5,9 +5,6 @@ export function middleware(request: NextRequest) {
     // Get the pathname of the request (e.g. /, /api/chat)
     const path = request.nextUrl.pathname
 
-    // Define public paths that don't require authentication
-    const isPublicPath = path === '/' || path === '/api/chat'
-
     // Add CORS headers for all responses
     const response = NextResponse.next()
 
@@ -22,13 +19,7 @@ export function middleware(request: NextRequest) {
 // Configure which paths the middleware should run on
 export const config = {
     matcher: [
-        /*
-         * Match all request paths except for the ones starting with:
-         * - api (API routes)
-         * - _next/static (static files)
-         * - _next/image (image optimization files)
-         * - favicon.ico (favicon file)
-         */
-        '/((?!api|_next/static|_next/image|favicon.ico).*)',
+        // Match all paths except static files
+        '/((?!_next/static|_next/image|favicon.ico).*)',
     ],
 } 

@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai"
 import { StreamingTextResponse, createStreamDataTransformer } from "ai"
 import { DataAPIClient } from "@datastax/astra-db-ts"
+import { NextResponse } from 'next/server'
 
 // Add CORS headers
 const corsHeaders = {
@@ -36,24 +37,28 @@ console.log('Environment check:', {
 })
 
 // Validate environment variables
-if (!GOOGLE_API_KEY) {
-    throw new Error('GOOGLE_API_KEY is not set in environment variables')
-}
+function validateEnv() {
+    if (!GOOGLE_API_KEY) {
+        return NextResponse.json({ error: 'GOOGLE_API_KEY is not set in environment variables' }, { status: 500 })
+    }
 
-if (!ASTRA_DB_API_ENDPOINT) {
-    throw new Error('ASTRA_DB_API_ENDPOINT is not set in environment variables')
-}
+    if (!ASTRA_DB_API_ENDPOINT) {
+        return NextResponse.json({ error: 'ASTRA_DB_API_ENDPOINT is not set in environment variables' }, { status: 500 })
+    }
 
-if (!ASTRA_DB_NAMESPACE) {
-    throw new Error('ASTRA_DB_NAMESPACE is not set in environment variables')
-}
+    if (!ASTRA_DB_NAMESPACE) {
+        return NextResponse.json({ error: 'ASTRA_DB_NAMESPACE is not set in environment variables' }, { status: 500 })
+    }
 
-if (!ASTRA_DB_COLLECTION) {
-    throw new Error('ASTRA_DB_COLLECTION is not set in environment variables')
-}
+    if (!ASTRA_DB_COLLECTION) {
+        return NextResponse.json({ error: 'ASTRA_DB_COLLECTION is not set in environment variables' }, { status: 500 })
+    }
 
-if (!ASTRA_DB_APPLICATION_TOKEN) {
-    throw new Error('ASTRA_DB_APPLICATION_TOKEN is not set in environment variables')
+    if (!ASTRA_DB_APPLICATION_TOKEN) {
+        return NextResponse.json({ error: 'ASTRA_DB_APPLICATION_TOKEN is not set in environment variables' }, { status: 500 })
+    }
+
+    return null
 }
 
 const genAI = new GoogleGenerativeAI(GOOGLE_API_KEY)
@@ -63,19 +68,32 @@ const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
 let client;
 let db;
 
-try {
-    console.log('Initializing Astra DB client...')
-    client = new DataAPIClient(ASTRA_DB_APPLICATION_TOKEN)
-    console.log('Creating DB connection...')
-    db = client.db(ASTRA_DB_API_ENDPOINT, {namespace: ASTRA_DB_NAMESPACE})
-    console.log('DB connection successful')
-} catch (error) {
-    console.error('Failed to initialize Astra DB:', error)
-    throw new Error(`Failed to initialize Astra DB: ${error.message}`)
+function initializeDB() {
+    try {
+        console.log('Initializing Astra DB client...')
+        client = new DataAPIClient(ASTRA_DB_APPLICATION_TOKEN)
+        console.log('Creating DB connection...')
+        db = client.db(ASTRA_DB_API_ENDPOINT, {namespace: ASTRA_DB_NAMESPACE})
+        console.log('DB connection successful')
+        return null
+    } catch (error) {
+        console.error('Failed to initialize Astra DB:', error)
+        return NextResponse.json({ error: `Failed to initialize Astra DB: ${error.message}` }, { status: 500 })
+    }
+}
+
+// Initialize the database
+const dbError = initializeDB()
+if (dbError) {
+    console.error('Failed to initialize database:', dbError)
 }
 
 export async function POST(req: Request){
     try {
+        // Validate environment variables
+        const envError = validateEnv()
+        if (envError) return envError
+
         const {messages} = await req.json()
         console.log('Received messages:', messages)
         
@@ -183,53 +201,28 @@ export async function POST(req: Request){
         // Use the ai package's stream transformer
         const transformedStream = stream.pipeThrough(createStreamDataTransformer())
         
-        return new Response(transformedStream, {
-            headers: {
-                'Content-Type': 'text/event-stream',
-                'Cache-Control': 'no-cache',
-                'Connection': 'keep-alive',
-                ...corsHeaders
-            },
-        })
+        return new StreamingTextResponse(transformedStream)
     } catch(err: any) {
         console.error('API error:', err)
         
         // Handle specific error types
         if (err.message?.includes('429')) {
-            return new Response(JSON.stringify({ 
+            return NextResponse.json({ 
                 error: 'Rate limit exceeded. Please try again later or check your API quota.',
                 details: err.message 
-            }), {
-                status: 429,
-                headers: { 
-                    'Content-Type': 'application/json',
-                    ...corsHeaders
-                }
-            })
+            }, { status: 429 })
         }
         
         if (err.message?.includes('API key')) {
-            return new Response(JSON.stringify({ 
+            return NextResponse.json({ 
                 error: 'Invalid API key. Please check your GOOGLE_API_KEY environment variable.',
                 details: err.message 
-            }), {
-                status: 401,
-                headers: { 
-                    'Content-Type': 'application/json',
-                    ...corsHeaders
-                }
-            })
+            }, { status: 401 })
         }
 
-        return new Response(JSON.stringify({ 
+        return NextResponse.json({ 
             error: 'Internal server error',
             details: err.message 
-        }), {
-            status: 500,
-            headers: { 
-                'Content-Type': 'application/json',
-                ...corsHeaders
-            }
-        })
+        }, { status: 500 })
     }
 }
