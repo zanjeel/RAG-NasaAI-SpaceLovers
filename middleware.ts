@@ -4,46 +4,19 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
     const path = request.nextUrl.pathname;
 
-    console.log('=== MIDDLEWARE START ===')
-    console.log('Request URL:', request.url)
-    console.log('Request method:', request.method)
-    console.log('Request path:', path)
-
-    // Handle API routes
+    // Skip middleware for API routes
     if (path.startsWith('/api/')) {
-        console.log('Processing API route:', path);
-        const response = NextResponse.next();
-        
-        // Add CORS headers to API responses
-        response.headers.set('Access-Control-Allow-Origin', '*');
-        response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-        response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-        
-        return response;
+        return NextResponse.next();
     }
 
-    // Handle CORS preflight requests
-    if (request.method === 'OPTIONS') {
-        console.log('Handling OPTIONS request in middleware');
-        return new NextResponse(null, {
-            status: 204,
-            headers: {
-                'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Requested-With',
-            },
-        });
-    }
-
-    // Get the response for non-API routes
+    // Get the response
     const response = NextResponse.next();
 
-    // Add CORS headers to all responses
+    // Add CORS headers
     response.headers.set('Access-Control-Allow-Origin', '*');
     response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-    console.log('=== MIDDLEWARE END ===')
     return response;
 }
 

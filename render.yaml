@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: nasa-rag
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: GOOGLE_API_KEY
+        sync: false
+      - key: ASTRA_DB_NAMESPACE
+        sync: false
+      - key: ASTRA_DB_COLLECTION
+        sync: false
+      - key: ASTRA_DB_API_ENDPOINT
+        sync: false
+      - key: ASTRA_DB_APPLICATION_TOKEN
+        sync: false 
