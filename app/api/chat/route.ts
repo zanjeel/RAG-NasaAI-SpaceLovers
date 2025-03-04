@@ -12,6 +12,7 @@ const corsHeaders = {
 
 // Handle OPTIONS request for CORS
 export async function OPTIONS() {
+    console.log('Handling OPTIONS request')
     return new Response(null, {
         status: 204,
         headers: corsHeaders
@@ -38,26 +39,33 @@ console.log('Environment check:', {
 
 // Validate environment variables
 function validateEnv() {
+    console.log('Validating environment variables...')
     if (!GOOGLE_API_KEY) {
+        console.error('Missing GOOGLE_API_KEY')
         return NextResponse.json({ error: 'GOOGLE_API_KEY is not set in environment variables' }, { status: 500 })
     }
 
     if (!ASTRA_DB_API_ENDPOINT) {
+        console.error('Missing ASTRA_DB_API_ENDPOINT')
         return NextResponse.json({ error: 'ASTRA_DB_API_ENDPOINT is not set in environment variables' }, { status: 500 })
     }
 
     if (!ASTRA_DB_NAMESPACE) {
+        console.error('Missing ASTRA_DB_NAMESPACE')
         return NextResponse.json({ error: 'ASTRA_DB_NAMESPACE is not set in environment variables' }, { status: 500 })
     }
 
     if (!ASTRA_DB_COLLECTION) {
+        console.error('Missing ASTRA_DB_COLLECTION')
         return NextResponse.json({ error: 'ASTRA_DB_COLLECTION is not set in environment variables' }, { status: 500 })
     }
 
     if (!ASTRA_DB_APPLICATION_TOKEN) {
+        console.error('Missing ASTRA_DB_APPLICATION_TOKEN')
         return NextResponse.json({ error: 'ASTRA_DB_APPLICATION_TOKEN is not set in environment variables' }, { status: 500 })
     }
 
+    console.log('Environment validation passed')
     return null
 }
 
@@ -89,10 +97,14 @@ if (dbError) {
 }
 
 export async function POST(req: Request){
+    console.log('Received POST request to /api/chat')
     try {
         // Validate environment variables
         const envError = validateEnv()
-        if (envError) return envError
+        if (envError) {
+            console.error('Environment validation failed:', envError)
+            return envError
+        }
 
         const {messages} = await req.json()
         console.log('Received messages:', messages)
@@ -103,11 +115,14 @@ export async function POST(req: Request){
         let docContext = ""
 
         // Get embedding from Gemini
+        console.log('Getting embedding from Gemini...')
         const embeddingModel = genAI.getGenerativeModel({ model: "embedding-001" })
         const embedding = await embeddingModel.embedContent(latestMessage)
         const embeddingArray = Array.from(embedding.embedding as unknown as number[])
+        console.log('Got embedding, length:', embeddingArray.length)
 
         try {
+            console.log('Querying database with embedding...')
             const collection = await db.collection(ASTRA_DB_COLLECTION)
             const cursor = collection.find(null, {
                 sort: {
@@ -117,14 +132,16 @@ export async function POST(req: Request){
             })
 
             const documents = await cursor.toArray()
+            console.log('Found documents:', documents.length)
             const docsMap = documents?.map(doc => doc.text)
             docContext = JSON.stringify(docsMap)
         } catch(err) {
-            console.log("Error querying db...")
+            console.error("Error querying db:", err)
             docContext = ""
         }
 
         // Format the conversation history for Gemini
+        console.log('Formatting messages for Gemini...')
         const formattedMessages = messages.map(msg => ({
             role: msg.role === 'user' ? 'user' : 'model',
             parts: [{ text: msg.content }]
@@ -165,6 +182,7 @@ export async function POST(req: Request){
         })
 
         // Convert Gemini stream to ReadableStream
+        console.log('Creating streaming response...')
         const stream = new ReadableStream({
             async start(controller) {
                 try {
@@ -191,6 +209,7 @@ export async function POST(req: Request){
                     }
         
                     controller.close();
+                    console.log('Stream completed successfully')
                 } catch (error) {
                     console.error('Streaming error:', error);
                     controller.error(error);
@@ -201,9 +220,15 @@ export async function POST(req: Request){
         // Use the ai package's stream transformer
         const transformedStream = stream.pipeThrough(createStreamDataTransformer())
         
+        console.log('Returning streaming response')
         return new StreamingTextResponse(transformedStream)
     } catch(err: any) {
         console.error('API error:', err)
+        console.error('Error details:', {
+            message: err.message,
+            stack: err.stack,
+            name: err.name
+        })
         
         // Handle specific error types
         if (err.message?.includes('429')) {

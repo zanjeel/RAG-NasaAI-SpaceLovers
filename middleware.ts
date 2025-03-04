@@ -2,6 +2,12 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
 export function middleware(request: NextRequest) {
+    console.log('Middleware processing request:', {
+        method: request.method,
+        path: request.nextUrl.pathname,
+        headers: Object.fromEntries(request.headers.entries())
+    })
+
     // Get the pathname of the request (e.g. /, /api/chat)
     const path = request.nextUrl.pathname
 
@@ -13,6 +19,16 @@ export function middleware(request: NextRequest) {
     response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
     response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 
+    // Handle OPTIONS preflight request
+    if (request.method === 'OPTIONS') {
+        console.log('Handling OPTIONS preflight request')
+        return new Response(null, { 
+            status: 204, 
+            headers: response.headers 
+        })
+    }
+
+    console.log('Request processed, continuing to handler')
     return response
 }
 

@@ -13,12 +13,33 @@ const Home =() =>{
         api: '/api/chat',
         onError: (error) => {
             console.error('Chat error:', error)
+            console.error('Error details:', {
+                message: error.message,
+                stack: error.stack,
+                name: error.name
+            })
         },
         onFinish: (message) => {
             console.log('Chat finished:', message)
+            console.log('Final message state:', {
+                content: message.content,
+                role: message.role,
+                id: message.id
+            })
         },
         onResponse: (response) => {
             console.log('Got response:', response)
+            console.log('Response details:', {
+                status: response.status,
+                statusText: response.statusText,
+                headers: Object.fromEntries(response.headers.entries())
+            })
+        },
+        onMessage: (message) => {
+            console.log('New message received:', message)
+        },
+        onStart: (message) => {
+            console.log('Chat started:', message)
         }
     })
     
@@ -26,7 +47,12 @@ const Home =() =>{
 
     useEffect(() => {
         console.log('Messages updated:', messages)
-    }, [messages])
+        console.log('Current messages state:', {
+            count: messages?.length,
+            lastMessage: messages?.[messages.length - 1],
+            isLoading
+        })
+    }, [messages, isLoading])
 
     const handlePrompt=(prompText)=>{
         console.log('Handling prompt:', prompText)
@@ -35,13 +61,18 @@ const Home =() =>{
             content:prompText,
             role:"user"
         }
+        console.log('Appending message:', msg)
         append(msg)
     }
 
     const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault()
         console.log('Form submitted with input:', input)
-        if (!input.trim()) return
+        if (!input.trim()) {
+            console.log('Empty input, skipping submission')
+            return
+        }
+        console.log('Submitting form...')
         handleSubmit(e)
     }
 
