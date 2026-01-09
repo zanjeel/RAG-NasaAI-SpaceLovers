@@ -1,16 +1,24 @@
 "use client"
 import Image from "next/image"
 import AILogo from "./assets/logosaas.png"
-import {useChat} from "ai/react"
-import {Message} from "ai"
+import {useChat} from "@ai-sdk/react"
+import {TextStreamChatTransport, UIMessage} from "ai"
 import Bubble from "./components/Bubble"
 import LoadingBubble from "./components/LoadingBubble"
 import PromptSuggestionsRow from "./components/PromptSuggestionsRow"
-import {useEffect} from "react"
+import {useEffect, useState} from "react"
+
 
 const Home =() =>{
-    const {append, isLoading, messages, input, handleInputChange, handleSubmit, setMessages}= useChat({
-        api: '/api/chat',
+    const [input, setInput] = useState("")
+    
+    const {sendMessage, status, messages, setMessages, error} = useChat({
+        transport: new TextStreamChatTransport({
+            api: '/api/chat',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        }),
         onError: (error) => {
             console.error('Chat error:', error)
             console.error('Error details:', {
@@ -19,30 +27,19 @@ const Home =() =>{
                 name: error.name
             })
         },
-        onFinish: (message) => {
+        onFinish: ({ message }) => {
             console.log('Chat finished:', message)
+            const textParts = message.parts.filter(part => part.type === 'text')
+            const content = textParts.map(part => part.type === 'text' ? part.text : '').join('')
             console.log('Final message state:', {
-                content: message.content,
+                content,
                 role: message.role,
                 id: message.id
             })
         },
-        onResponse: (response) => {
-            console.log('Got response:', response)
-            console.log('Response details:', {
-                status: response.status,
-                statusText: response.statusText,
-                headers: Object.fromEntries(response.headers.entries())
-            })
-        },
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: {
-            // Add any additional body parameters here
-        }
     })
     
+    const isLoading = status === 'streaming' || status === 'submitted'
     const noMessages= !messages || messages.length===0
 
     useEffect(() => {
@@ -54,18 +51,16 @@ const Home =() =>{
         })
     }, [messages, isLoading])
 
-    const handlePrompt=(prompText)=>{
+    const handlePrompt=(prompText: string)=>{
         console.log('Handling prompt:', prompText)
-        const msg: Message= {
-            id: crypto.randomUUID(),
-            content:prompText,
-            role:"user"
-        }
-        console.log('Appending message:', msg)
-        append(msg)
+        sendMessage({ text: prompText })
     }
 
-    const handleFormSubmit = async (e) => {
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setInput(e.target.value)
+    }
+
+    const handleFormSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
     
         if (!input.trim()) {
@@ -75,7 +70,8 @@ const Home =() =>{
     
         try {
             console.log('Submitting form with input:', input);
-            await handleSubmit(e);
+            sendMessage({ text: input })
+            setInput("")
         } catch (error) {
             console.error('Error submitting form:', error);
         }

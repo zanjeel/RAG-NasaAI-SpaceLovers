@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai"
-import { StreamingTextResponse, createStreamDataTransformer } from "ai"
+import { createTextStreamResponse } from "ai"
 import { DataAPIClient } from "@datastax/astra-db-ts"
 import { NextResponse } from 'next/server'
 
@@ -137,7 +137,17 @@ export async function POST(request: Request) {
         const {messages} = body
         console.log('Received messages:', messages)
         
-        const latestMessage = messages[messages?.length-1]?.content
+        // Extract text from UIMessage parts array
+        const getMessageText = (msg: any) => {
+            if (msg.content) return msg.content // Support old format
+            if (msg.parts) {
+                const textParts = msg.parts.filter((part: any) => part.type === 'text')
+                return textParts.map((part: any) => part.text || '').join('')
+            }
+            return ''
+        }
+        
+        const latestMessage = getMessageText(messages[messages?.length-1])
         console.log('Latest message:', latestMessage)
         
         let docContext = ""
@@ -175,7 +185,7 @@ export async function POST(request: Request) {
         console.log('Formatting messages for Gemini...')
         const formattedMessages = messages.map(msg => ({
             role: msg.role === 'user' ? 'user' : 'model',
-            parts: [{ text: msg.content }]
+            parts: [{ text: getMessageText(msg) }]
         }))
 
         // Add the system prompt
@@ -212,9 +222,9 @@ export async function POST(request: Request) {
             contents: formattedMessages
         })
 
-        // Convert Gemini stream to ReadableStream
+        // Convert Gemini stream to ReadableStream<string>
         console.log('Creating streaming response...')
-        const stream = new ReadableStream({
+        const textStream = new ReadableStream<string>({
             async start(controller) {
                 try {
                     let buffer = ""; // Buffer to accumulate text properly
@@ -228,7 +238,7 @@ export async function POST(request: Request) {
         
                             // Check if the buffer has a complete sentence
                             if (buffer.includes('. ') || buffer.includes('! ') || buffer.includes('? ')) {
-                                controller.enqueue(new TextEncoder().encode(buffer + '\n')); 
+                                controller.enqueue(buffer + '\n'); 
                                 buffer = ""; // Reset buffer after sending
                             }
                         }
@@ -236,7 +246,7 @@ export async function POST(request: Request) {
         
                     // Send any remaining text in the buffer
                     if (buffer.trim().length > 0) {
-                        controller.enqueue(new TextEncoder().encode(buffer + '\n\n'));
+                        controller.enqueue(buffer + '\n\n');
                     }
         
                     controller.close();
@@ -248,11 +258,8 @@ export async function POST(request: Request) {
             }
         });
         
-        // Use the ai package's stream transformer
-        const transformedStream = stream.pipeThrough(createStreamDataTransformer())
-        
         console.log('Returning streaming response')
-        return new StreamingTextResponse(transformedStream, { headers: corsHeaders })
+        return createTextStreamResponse({ textStream, headers: corsHeaders })
     } catch(err: any) {
         console.error('=== API ERROR ===')
         console.error('Error type:', err.name)
