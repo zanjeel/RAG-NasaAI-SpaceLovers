@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai"
 import { createTextStreamResponse } from "ai"
 import { DataAPIClient } from "@datastax/astra-db-ts"
 import { NextResponse } from 'next/server'
+import { HfInference } from '@huggingface/inference'
 
 // Add CORS headers
 const corsHeaders = {
@@ -27,7 +28,8 @@ const {
     ASTRA_DB_COLLECTION, 
     ASTRA_DB_API_ENDPOINT, 
     ASTRA_DB_APPLICATION_TOKEN, 
-    GOOGLE_API_KEY
+    GOOGLE_API_KEY,
+    HUGGINGFACE_API_KEY
 } = process.env
 
 // Log environment variables (without sensitive data)
@@ -79,6 +81,12 @@ let model: any = null;
 if (GOOGLE_API_KEY) {
     genAI = new GoogleGenerativeAI(GOOGLE_API_KEY);
     model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+}
+
+// Initialize Hugging Face Inference for embeddings (768 dimensions to match database)
+let hf: HfInference | null = null;
+if (HUGGINGFACE_API_KEY) {
+    hf = new HfInference(HUGGINGFACE_API_KEY);
 }
 
 // Initialize Astra DB client with error handling
@@ -152,30 +160,64 @@ export async function POST(request: Request) {
         
         let docContext = ""
 
-        // Get embedding from Gemini
-        console.log('Getting embedding from Gemini...')
-        const embeddingModel = genAI.getGenerativeModel({ model: "embedding-001" })
-        const embedding = await embeddingModel.embedContent(latestMessage)
-        const embeddingArray = Array.from(embedding.embedding as unknown as number[])
-        console.log('Got embedding, length:', embeddingArray.length)
+        // Get embedding from Hugging Face (768 dimensions to match database)
+        console.log('Getting embedding from Hugging Face...')
+        let embeddingArray: number[] = []
+        try {
+            if (!hf) {
+                throw new Error('Hugging Face API key not configured')
+            }
+            // Using BAAI/bge-base-en-v1.5 which outputs 768 dimensions (matches database)
+            const embedding = await hf.featureExtraction({
+                model: 'BAAI/bge-base-en-v1.5',
+                inputs: latestMessage,
+            })
+            
+            // Convert to array format (Hugging Face returns nested arrays)
+            embeddingArray = Array.isArray(embedding) && Array.isArray(embedding[0]) 
+                ? embedding[0] as number[]
+                : embedding as number[]
+            
+            // Ensure it's exactly 768 dimensions
+            if (embeddingArray.length !== 768) {
+                console.warn(`Expected 768 dimensions, got ${embeddingArray.length}. Truncating or padding.`)
+                if (embeddingArray.length > 768) {
+                    embeddingArray = embeddingArray.slice(0, 768)
+                } else {
+                    embeddingArray = [...embeddingArray, ...new Array(768 - embeddingArray.length).fill(0)]
+                }
+            }
+            console.log('Got embedding, length:', embeddingArray.length)
+        } catch (embedError: any) {
+            console.error('Error getting embedding from Hugging Face:', embedError)
+            // Fallback to empty array - will continue without RAG context
+            console.warn('Continuing without RAG context due to embedding error')
+            embeddingArray = []
+        }
 
         try {
             console.log('Querying database with embedding...')
             if (!db || !ASTRA_DB_COLLECTION) {
                 throw new Error('Database or collection not initialized');
             }
-            const collection = await db.collection(ASTRA_DB_COLLECTION)
-            const cursor = collection.find(null, {
-                sort: {
-                    $vector: embeddingArray,
-                },
-                limit: 10
-            })
+            // Only query if we have an embedding
+            if (embeddingArray.length > 0) {
+                const collection = await db.collection(ASTRA_DB_COLLECTION)
+                const cursor = collection.find(null, {
+                    sort: {
+                        $vector: embeddingArray,
+                    },
+                    limit: 10
+                })
 
-            const documents = await cursor.toArray()
-            console.log('Found documents:', documents.length)
-            const docsMap = documents?.map(doc => doc.text)
-            docContext = JSON.stringify(docsMap)
+                const documents = await cursor.toArray()
+                console.log('Found documents:', documents.length)
+                const docsMap = documents?.map(doc => doc.text)
+                docContext = JSON.stringify(docsMap)
+            } else {
+                console.log('No embedding available, skipping vector search')
+                docContext = ""
+            }
         } catch(err) {
             console.error("Error querying db:", err)
             docContext = ""
