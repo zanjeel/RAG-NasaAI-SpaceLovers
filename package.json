@@ -10,13 +10,14 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@ai-sdk/react": "^3.0.25",
     "@datastax/astra-db-ts": "^1.1.0",
     "@google/generative-ai": "^0.2.1",
-    "ai": "3.1",
+    "ai": "^6.0.24",
     "dotenv": "^16.4.5",
-    "langchain": "^0.1.36",
-    "next": "14.2.3",
-    "puppeteer": "^19.11.1",
+    "langchain": "^0.3.37",
+    "next": "^14.2.35",
+    "puppeteer": "^24.34.0",
     "react": "^18",
     "react-dom": "^18",
     "ts-node": "^10.9.2"
