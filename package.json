@@ -16,6 +16,7 @@
     "@huggingface/inference": "^4.13.5",
     "ai": "^6.0.24",
     "dotenv": "^16.4.5",
+    "groq-sdk": "^0.37.0",
     "langchain": "^0.3.37",
     "next": "^14.2.35",
     "puppeteer": "^24.34.0",

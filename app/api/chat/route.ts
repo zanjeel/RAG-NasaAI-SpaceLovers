@@ -1,8 +1,8 @@
-import { GoogleGenerativeAI } from "@google/generative-ai"
 import { createTextStreamResponse } from "ai"
 import { DataAPIClient } from "@datastax/astra-db-ts"
 import { NextResponse } from 'next/server'
 import { HfInference } from '@huggingface/inference'
+import Groq from 'groq-sdk'
 
 // Add CORS headers
 const corsHeaders = {
@@ -28,8 +28,8 @@ const {
     ASTRA_DB_COLLECTION, 
     ASTRA_DB_API_ENDPOINT, 
     ASTRA_DB_APPLICATION_TOKEN, 
-    GOOGLE_API_KEY,
-    HUGGINGFACE_API_KEY
+    HUGGINGFACE_API_KEY,
+    GROQ_API_KEY
 } = process.env
 
 // Log environment variables (without sensitive data)
@@ -38,16 +38,22 @@ console.log('Environment check:', {
     hasNamespace: !!ASTRA_DB_NAMESPACE,
     hasCollection: !!ASTRA_DB_COLLECTION,
     hasToken: !!ASTRA_DB_APPLICATION_TOKEN,
-    hasGoogleKey: !!GOOGLE_API_KEY,
+    hasHuggingFaceKey: !!HUGGINGFACE_API_KEY,
+    hasGroqKey: !!GROQ_API_KEY,
     apiEndpoint: ASTRA_DB_API_ENDPOINT?.substring(0, 20) + '...' // Log first 20 chars only
 })
 
 // Validate environment variables
 function validateEnv() {
     console.log('Validating environment variables...')
-    if (!GOOGLE_API_KEY) {
-        console.error('Missing GOOGLE_API_KEY')
-        return NextResponse.json({ error: 'GOOGLE_API_KEY is not set in environment variables' }, { status: 500, headers: corsHeaders })
+    if (!HUGGINGFACE_API_KEY) {
+        console.error('Missing HUGGINGFACE_API_KEY')
+        return NextResponse.json({ error: 'HUGGINGFACE_API_KEY is not set in environment variables' }, { status: 500, headers: corsHeaders })
+    }
+
+    if (!GROQ_API_KEY) {
+        console.error('Missing GROQ_API_KEY')
+        return NextResponse.json({ error: 'GROQ_API_KEY is not set in environment variables' }, { status: 500, headers: corsHeaders })
     }
 
     if (!ASTRA_DB_API_ENDPOINT) {
@@ -74,20 +80,22 @@ function validateEnv() {
     return null
 }
 
-// Initialize Gemini AI only if API key is available
-let genAI: GoogleGenerativeAI | null = null;
-let model: any = null;
-
-if (GOOGLE_API_KEY) {
-    genAI = new GoogleGenerativeAI(GOOGLE_API_KEY);
-    model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-}
-
-// Initialize Hugging Face Inference for embeddings (768 dimensions to match database)
+// Initialize Hugging Face Inference for embeddings only
 let hf: HfInference | null = null;
 if (HUGGINGFACE_API_KEY) {
     hf = new HfInference(HUGGINGFACE_API_KEY);
 }
+
+// Initialize Groq for text generation
+let groq: Groq | null = null;
+if (GROQ_API_KEY) {
+    groq = new Groq({
+        apiKey: GROQ_API_KEY,
+    });
+}
+
+// Groq model (free tier compatible, fast inference)
+const GROQ_MODEL = "llama-3.1-8b-instant" // Fast, free tier compatible model
 
 // Initialize Astra DB client with error handling
 let client: DataAPIClient | null = null;
@@ -138,8 +146,12 @@ export async function POST(request: Request) {
             return envError
         }
 
-        if (!genAI || !model) {
-            return NextResponse.json({ error: 'Gemini AI not initialized' }, { status: 500, headers: corsHeaders })
+        if (!hf) {
+            return NextResponse.json({ error: 'Hugging Face AI not initialized' }, { status: 500, headers: corsHeaders })
+        }
+
+        if (!groq) {
+            return NextResponse.json({ error: 'Groq AI not initialized' }, { status: 500, headers: corsHeaders })
         }
 
         const {messages} = body
@@ -211,94 +223,116 @@ export async function POST(request: Request) {
                 })
 
                 const documents = await cursor.toArray()
-                console.log('Found documents:', documents.length)
+                console.log('✅ Vector DB query successful! Found documents:', documents.length)
+                if (documents.length > 0) {
+                    console.log('📄 First document preview:', documents[0].text?.substring(0, 100) + '...')
+                }
                 const docsMap = documents?.map(doc => doc.text)
                 docContext = JSON.stringify(docsMap)
+                console.log('📊 RAG context length:', docContext.length, 'characters')
             } else {
                 console.log('No embedding available, skipping vector search')
                 docContext = ""
             }
-        } catch(err) {
-            console.error("Error querying db:", err)
+        } catch(err: any) {
+            console.error("❌ Error querying db:", err)
+            console.error("❌ DB Error details:", {
+                message: err.message,
+                code: err.code,
+                name: err.name
+            })
+            console.warn("⚠️ Falling back to general knowledge (no RAG context)")
             docContext = ""
         }
 
-        // Format the conversation history for Gemini
-        console.log('Formatting messages for Gemini...')
-        const formattedMessages = messages.map(msg => ({
-            role: msg.role === 'user' ? 'user' : 'model',
-            parts: [{ text: getMessageText(msg) }]
-        }))
+        // Format messages for Groq chat API
+        console.log('Formatting messages for Groq...')
+        
+        // Build the system prompt
+        const systemPrompt = `You are a funny, space nerd who knows everything about NASA. You must know their recent space exploration missions and latest space news. The context will provide you with data from the NASA Wikipedia Websites. If the context doesn't include the information you need, answer based on your existing knowledge.
 
-        // Add the system prompt
-        formattedMessages.unshift({
-            role: 'user',
-            parts: [{
-                text: `You are a funny, space nerd who knows everything
-                about NASA. You must know their recent space exploration missions and latest space news. 
-                The context will provide you with data from the NASA Wikipedia Websites.
-                If the context doesn't include the information you need, answer
-                based on your existing knowledge.
+Format your responses as follows:
+1. Break information into clear, concise paragraphs but keep them fun and nerdy.
+2. Each paragraph should be 3-5 lines maximum.
+3. Use 2 line spacing between paragraphs.
+4. Do not use asterisks or markdown formatting or images.
+5. Use simple, clear language.
+6. Keep sentences short and direct but nerdy.`
 
-                Format your responses as follows:
-                1. Break information into clear, concise paragraphs but keep them fun and nerdy.
-                2. Each paragraph should be 3-5 lines maximum.
-                3. Use 2 line spacing between paragraphs.
-                4. Do not use asterisks or markdown formatting or images.
-                5. Use simple, clear language.
-                6. Keep sentences short and direct but nerdy.
+        // Format messages for Groq chat API
+        const groqMessages: Array<{role: 'system' | 'user' | 'assistant', content: string}> = []
+        
+        // Add system message with context
+        let systemContent = systemPrompt
+        let ragStatus = "none"
+        if (docContext && docContext.length > 2) { // Check for actual content (not just "[]")
+            console.log('✅ Using RAG context in prompt')
+            console.log('📊 RAG context preview:', docContext.substring(0, 200) + '...')
+            ragStatus = "active"
+            systemContent += `\n\nContext from NASA Wikipedia:\n${docContext}`
+        } else {
+            console.warn('⚠️ No RAG context available - using general knowledge only')
+            ragStatus = "fallback"
+        }
+        groqMessages.push({ role: 'system', content: systemContent })
+        
+        // Add conversation history
+        for (let i = 0; i < messages.length - 1; i++) {
+            const msg = messages[i]
+            const text = getMessageText(msg)
+            groqMessages.push({
+                role: msg.role === 'user' ? 'user' : 'assistant',
+                content: text
+            })
+        }
+        
+        // Add current user message
+        groqMessages.push({ role: 'user', content: latestMessage })
 
-                -----------
-                START CONTEXT
-                ${docContext}
-                END CONTEXT
-                ------------
-                QUESTION: ${latestMessage}
-                ------------
-                `
-            }]
-        })
-
-        console.log('Sending to Gemini:', formattedMessages)
-        const result = await model.generateContentStream({
-            contents: formattedMessages
-        })
-
-        // Convert Gemini stream to ReadableStream<string>
-        console.log('Creating streaming response...')
+        console.log('Sending to Groq model:', GROQ_MODEL)
+        
+        // Use Groq for text generation with streaming
         const textStream = new ReadableStream<string>({
             async start(controller) {
                 try {
-                    let buffer = ""; // Buffer to accumulate text properly
-        
-                    for await (const chunk of result.stream) {
-                        const text = chunk.text();
-                        console.log('Received chunk:', text);
-                        
-                        if (text) {
-                            buffer += text; // Append new chunk to the buffer
-        
-                            // Check if the buffer has a complete sentence
-                            if (buffer.includes('. ') || buffer.includes('! ') || buffer.includes('? ')) {
-                                controller.enqueue(buffer + '\n'); 
-                                buffer = ""; // Reset buffer after sending
-                            }
+                    // Use Groq chat completions with streaming
+                    console.log('Calling Groq chat completions...')
+                    const stream = await groq!.chat.completions.create({
+                        model: GROQ_MODEL,
+                        messages: groqMessages,
+                        temperature: 0.7,
+                        max_tokens: 1024,
+                        stream: true
+                    })
+                    
+                    // Stream the response
+                    for await (const chunk of stream) {
+                        const content = chunk.choices[0]?.delta?.content || ''
+                        if (content) {
+                            controller.enqueue(content)
                         }
                     }
-        
-                    // Send any remaining text in the buffer
-                    if (buffer.trim().length > 0) {
-                        controller.enqueue(buffer + '\n\n');
-                    }
-        
-                    controller.close();
+                    
+                    controller.close()
                     console.log('Stream completed successfully')
-                } catch (error) {
-                    console.error('Streaming error:', error);
-                    controller.error(error);
+                } catch (error: any) {
+                    console.error('Streaming error:', error)
+                    console.error('Error details:', {
+                        message: error.message,
+                        stack: error.stack,
+                        name: error.name
+                    })
+                    // Try to send error message before closing
+                    try {
+                        controller.enqueue(`\n\nError: ${error.message || 'Unknown error occurred'}`)
+                        controller.close()
+                    } catch (closeError) {
+                        // If we can't close properly, just log it
+                        console.error('Error closing stream:', closeError)
+                    }
                 }
             }
-        });
+        })
         
         console.log('Returning streaming response')
         return createTextStreamResponse({ textStream, headers: corsHeaders })
@@ -321,9 +355,9 @@ export async function POST(request: Request) {
             }, { status: 429, headers: corsHeaders })
         }
         
-        if (err.message?.includes('API key')) {
+        if (err.message?.includes('API key') || err.message?.includes('401') || err.message?.includes('Unauthorized')) {
             return NextResponse.json({ 
-                error: 'Invalid API key. Please check your GOOGLE_API_KEY environment variable.',
+                error: 'Invalid API key. Please check your HUGGINGFACE_API_KEY environment variable.',
                 details: err.message 
             }, { status: 401, headers: corsHeaders })
         }
